@@ -10,19 +10,36 @@ class WeatherController extends Controller
         // Валидация входных данных
         $request->validate([
             'units' => 'nullable|in:metric,imperial,standard',
+            'lat'   => 'nullable|numeric',
+            'lon'   => 'nullable|numeric',
         ]);
 
         $units = $request->input('units', 'metric'); // по умолчанию — metric
         $apiKey = config('app.openweather_api_key');
-        $response = Http::get('http://api.openweathermap.org/data/2.5/weather', [
-            'q' => $city,
-            'appid' => $apiKey,
-            'units' => 'metric',
-            'lang' => 'ru'
-        ]);
+
+        if ($request->has(['lat', 'lon'])) {
+            $query = [
+                'lat' => $request->input('lat'),
+                'lon' => $request->input('lon'),
+                'appid' => $apiKey,
+                'units' => $units,
+                'lang' => 'ru'
+            ];
+        } elseif ($city) {
+            $query = [
+                'q' => $city,
+                'appid' => $apiKey,
+                'units' => 'metric',
+                'lang' => 'ru'
+            ];
+        } else {
+            return response()->json(['error' => 'Укажите город или координаты'], 404);
+        }
+        
+        $response = Http::get('http://api.openweathermap.org/data/2.5/weather', $query);
 
         if (!$response->successful()) {
-            return response()->json(['error' => 'City not found'], 404);
+            return response()->json(['error' => 'Не удалось получить данные о погоде'], 500);
         }
 
         $data = $response->json();
